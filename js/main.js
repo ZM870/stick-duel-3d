@@ -16,16 +16,40 @@ const audio = new AudioEngine();
 const loadedModels = {};
 const gltfLoader = new GLTFLoader();
 
+async function loadGltf(url) {
+  const gzUrl = url.replace(/\.glb(\?.*)?$/, '.glb.gz$1');
+  try {
+    const res = await fetch(gzUrl, { cache: 'force-cache' });
+    if (!res.ok) return gltfLoader.loadAsync(url);
+    const raw = await res.arrayBuffer();
+    const bytes = new Uint8Array(raw);
+    let data = raw;
+    if (bytes[0] === 0x1f && bytes[1] === 0x8b) {
+      if (typeof DecompressionStream === 'undefined') {
+        return gltfLoader.loadAsync(url);
+      }
+      const stream = new Blob([raw]).stream().pipeThrough(new DecompressionStream('gzip'));
+      data = await new Response(stream).arrayBuffer();
+    }
+    return await new Promise((resolve, reject) => {
+      gltfLoader.parse(data, '', resolve, reject);
+    });
+  } catch (err) {
+    console.warn(`${url} 压缩包加载失败，回退原文件`, err);
+    return gltfLoader.loadAsync(url);
+  }
+}
+
 async function loadPair(id, riggedUrl, staticUrl) {
   try {
-    const gltf = await gltfLoader.loadAsync(riggedUrl);
+    const gltf = await loadGltf(riggedUrl);
     loadedModels[id] = { scene: gltf.scene, animations: gltf.animations };
     return;
   } catch (err) {
     console.warn(`${id} 骨骼 GLB 加载失败，尝试静态网格`, err);
   }
   try {
-    const gltf = await gltfLoader.loadAsync(staticUrl);
+    const gltf = await loadGltf(staticUrl);
     loadedModels[id] = { scene: gltf.scene, animations: [] };
   } catch (err) {
     console.warn(`${id} 静态 GLB 也加载失败，使用程序化模型`, err);
@@ -232,7 +256,7 @@ function openCharacterSelect() {
   menu?.classList.add('hidden');
   characterSelect?.classList.add('show');
   renderCharacterCards();
-  ensureModel(selectedP1);
+  ensurePair(selectedP1, selectedP2);
 }
 
 function closeCharacterSelect() {
@@ -248,7 +272,7 @@ characterCards?.addEventListener('click', (e) => {
   selectedP1 = card.dataset.selectChar;
   renderCharacterCards();
   renderRoster();
-  ensureModel(selectedP1);
+  ensurePair(selectedP1, selectedP2);
 });
 
 selectBack?.addEventListener('click', closeCharacterSelect);
