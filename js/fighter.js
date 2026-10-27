@@ -86,12 +86,24 @@ export class Fighter {
     const asset = this.game.loadedModels?.[this.char.id];
     if (!asset || this.stickman instanceof GltfMascot) return false;
     const old = this.stickman;
-    try { this.game.arena.scene.remove(old.root); } catch { /* ignore */ }
-    this.stickman = new GltfMascot(this.char, asset.scene, asset.animations ?? []);
-    this.stickman.root.position.set(this.x, 0, this.z);
-    this.stickman.root.rotation.set(0, this.facingAngle, 0);
-    this.game.arena.scene.add(this.stickman.root);
-    return true;
+    let next = null;
+    try {
+      next = new GltfMascot(this.char, asset.scene, asset.animations ?? []);
+      next.root.position.set(this.x, 0, this.z);
+      next.root.rotation.set(0, this.facingAngle, 0);
+      this.stickman = next;
+      this.game.arena.scene.add(next.root);
+      try { this.game.arena.scene.remove(old.root); } catch { /* ignore */ }
+      return true;
+    } catch (err) {
+      console.warn(`${this.char.id} 高清模型替换失败，保留备用模型`, err);
+      if (next) {
+        try { this.game.arena.scene.remove(next.root); } catch { /* ignore */ }
+      }
+      this.stickman = old;
+      if (!old.root.parent) this.game.arena.scene.add(old.root);
+      return false;
+    }
   }
 
   forward() {

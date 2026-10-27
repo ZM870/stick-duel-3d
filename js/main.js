@@ -79,7 +79,10 @@ async function ensureModel(id) {
   const staticUrl = MODEL_STATIC_URLS[id];
   if (!rigged) return;
   const job = loadPair(id, rigged, staticUrl)
-    .then(() => arena.addBambuModels(loadedModels))
+    .then(() => {
+      arena.addBambuModels(loadedModels);
+      game?.upgradeModels();
+    })
     .finally(() => modelLoads.delete(id));
   modelLoads.set(id, job);
   return job;
