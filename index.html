@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#05060a" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="format-detection" content="telephone=no" />
+  <title>奶黄小队 · 3D 对战</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='28' fill='%23ff5a4e'/%3E%3Ccircle cx='32' cy='32' r='18' fill='%23ffd166'/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="./styles.css" />
+  <script>
+    window.addEventListener('error', function (e) {
+      var el = document.getElementById('error-banner');
+      if (el) {
+        el.textContent = '运行错误：' + (e.message || e.error || '未知错误');
+        el.classList.add('show');
+      }
+    });
+    window.addEventListener('unhandledrejection', function (e) {
+      var el = document.getElementById('error-banner');
+      if (el) {
+        el.textContent = '运行错误：' + (e.reason && (e.reason.stack || e.reason.message) || e.reason || '未知错误');
+        el.classList.add('show');
+      }
+    });
+  </script>
+</head>
+<body>
+  <div id="app">
+    <div id="stage">
+      <canvas id="game"></canvas>
+
+      <div id="hud">
+        <div class="hud-side left">
+          <div class="meta">
+            <span id="p1-name" class="fighter-name">奶黄</span>
+            <span id="p1-wins" class="wins"></span>
+          </div>
+          <div class="bar hp">
+            <div id="p1-hp" class="fill"></div>
+            <span id="p1-hp-text" class="bar-text">1000</span>
+          </div>
+          <div class="bar energy">
+            <div id="p1-energy" class="fill"></div>
+          </div>
+        </div>
+        <div class="hud-center">
+          <div id="timer">90</div>
+          <div id="round-label">ROUND 1</div>
+        </div>
+        <div class="hud-side right">
+          <div class="meta">
+            <span id="p2-wins" class="wins"></span>
+            <span id="p2-name" class="fighter-name">电脑·奶狗</span>
+          </div>
+          <div class="bar hp">
+            <div id="p2-hp" class="fill"></div>
+            <span id="p2-hp-text" class="bar-text">1000</span>
+          </div>
+          <div class="bar energy">
+            <div id="p2-energy" class="fill"></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="announce"></div>
+      <div id="toast"></div>
+      <div id="flash"></div>
+
+      <div id="menu" class="overlay show">
+        <div class="menu-card">
+          <div class="eyebrow">3D MASCOT DUEL · 人机对战</div>
+          <h1>奶黄小队 · 对战</h1>
+          <p class="sub">你控制 P1 · 电脑控制 P2 · 手机横屏 · 桌面键盘</p>
+
+          <div class="roster">
+            <div class="roster-side">
+              <span class="roster-label">P1</span>
+              <div id="p1-roster" class="chips"></div>
+            </div>
+            <div class="vs">VS</div>
+            <div class="roster-side right">
+              <span class="roster-label">电脑 P2</span>
+              <div id="p2-roster" class="chips"></div>
+            </div>
+          </div>
+          <div id="matchup" class="matchup">奶黄 VS 电脑·奶狗</div>
+
+          <div class="difficulty">
+            <span class="difficulty-label">电脑难度</span>
+            <div id="difficulty-options" class="difficulty-options">
+              <button type="button" class="difficulty-btn" data-difficulty="easy">简单</button>
+              <button type="button" class="difficulty-btn active" data-difficulty="normal">普通</button>
+              <button type="button" class="difficulty-btn" data-difficulty="hard">困难</button>
+            </div>
+          </div>
+
+          <button id="start-btn" class="primary">开始对战</button>
+          <button id="lan-btn" class="ghost lan-entry" type="button">局域网对战</button>
+          <div class="menu-actions">
+            <button id="fullscreen-btn" class="ghost">全屏</button>
+            <button id="mute-btn" class="ghost">声音：开</button>
+            <a class="ghost" href="./showcase.html" target="_blank" rel="noopener">模型展示</a>
+          </div>
+
+          <div class="controls-hint">
+            <span class="desktop-only"><b>P1</b> WASD 移动 · J 普攻 · K 技1 · L 技2（长按蓄力，4秒自动放出） · I 大招 · Shift 闪避 · 空格 跳跃</span>
+            <span class="desktop-only"><b>电脑 P2</b> 自动移动、普攻、技能和大招</span>
+            <span class="touch-only"><b>手机</b> 左半屏任意位置按住拖动即可移动 · 攻 / 技1 / 技2（长按蓄力） / 奥 / 闪 / 跳；P2 由电脑操控</span>
+          </div>
+        </div>
+      </div>
+
+      <div id="character-select" class="overlay select-screen">
+        <div class="select-wrap">
+          <div class="select-head">
+            <div class="eyebrow">CHOOSE YOUR FIGHTER</div>
+            <h2>选择你要玩的人物</h2>
+            <p>点击角色卡片确认出战 · 对手由电脑控制</p>
+          </div>
+          <div id="character-cards" class="character-cards"></div>
+          <div class="select-footer">
+            <div id="select-opponent" class="select-opponent"></div>
+            <div class="select-actions">
+              <button id="select-back" class="ghost" type="button">返回</button>
+              <button id="select-confirm" class="primary" type="button">开始对战</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="lan-menu" class="overlay lan-screen">
+        <div class="lan-card">
+          <div class="eyebrow">LAN · 2P</div>
+          <h2>局域网对战</h2>
+          <p class="lan-note">两台电脑连接同一个 WiFi，一台创建，另一台输入 IP 加入。</p>
+          <button id="lan-create" class="primary" type="button">创建房间</button>
+          <div class="lan-ip">本机 IP：<b id="lan-ip">--</b></div>
+          <div class="lan-direct">手机浏览器打开：<b id="lan-direct-url">http://--:8080</b></div>
+          <div class="lan-join-row">
+            <input id="lan-ip-input" type="text" inputmode="decimal" placeholder="主机 IP，例如 192.168.1.7" autocomplete="off" />
+            <button id="lan-join" class="primary" type="button">加入房间</button>
+          </div>
+          <div id="lan-status" class="lan-status">未连接</div>
+          <div id="lan-chars" class="lan-chars" hidden>
+            <div id="lan-role-label" class="lan-role">选择角色</div>
+            <div class="lan-char-row">
+              <button class="lan-char" data-lan-char="penguin" type="button">企鹅</button>
+              <button class="lan-char" data-lan-char="naigou" type="button">奶狗</button>
+            </div>
+          </div>
+          <button id="lan-start" class="primary" type="button" hidden>开始对战</button>
+          <button id="lan-back" class="ghost" type="button">返回主菜单</button>
+        </div>
+      </div>
+
+      <div id="lan-pause" class="overlay lan-pause-screen">
+        <div class="lan-card">
+          <div class="eyebrow">PAUSED</div>
+          <h2>暂停</h2>
+          <button id="lan-resume" class="primary" type="button">继续</button>
+          <button id="lan-exit" class="ghost" type="button">退出对战</button>
+        </div>
+      </div>
+
+      <div id="result" class="overlay result">
+        <div class="result-card">
+          <div class="eyebrow">MATCH OVER</div>
+          <h2 id="result-title">奶黄 获胜</h2>
+          <p id="result-sub"></p>
+          <div class="result-actions">
+            <button id="continue-btn" class="primary" type="button">继续</button>
+            <button id="exit-btn" class="ghost" type="button">退出</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="loading" class="loading-screen" aria-live="polite">
+        <div class="loading-card">
+          <div class="loading-spinner"></div>
+          <strong>正在加载出战角色</strong>
+          <span>只加载当前选择的两名角色，首次稍慢，之后会自动缓存</span>
+        </div>
+      </div>
+
+      <div id="error-banner"></div>
+    </div>
+
+    <div id="touch-controls">
+      <div class="side p1" data-joystick-zone="0">
+        <div class="side-tag">P1</div>
+        <div class="joystick" data-joystick="0">
+          <div class="joy-ring"></div>
+          <div class="joy-knob"></div>
+        </div>
+        <div class="actions">
+          <button class="action attack" data-player="0" data-action="attack"><span>攻</span><i class="cd"></i></button>
+          <button class="action" data-player="0" data-action="skill1"><span>技1</span><i class="cd"></i></button>
+          <button class="action" data-player="0" data-action="skill2"><span>技2</span><i class="cd"></i></button>
+          <button class="action ultimate" data-player="0" data-action="ultimate"><span>奥</span><i class="cd"></i></button>
+          <button class="action dodge" data-player="0" data-action="dodge"><span>闪</span><i class="cd"></i></button>
+          <button class="action jump" data-player="0" data-action="jump"><span>跳</span></button>
+        </div>
+      </div>
+      <div class="side p2" id="p2-controls">
+        <div class="side-tag">电脑</div>
+        <div class="actions">
+          <button class="action attack" data-player="1" data-action="attack"><span>攻</span><i class="cd"></i></button>
+          <button class="action" data-player="1" data-action="skill1"><span>技1</span><i class="cd"></i></button>
+          <button class="action" data-player="1" data-action="skill2"><span>技2</span><i class="cd"></i></button>
+          <button class="action ultimate" data-player="1" data-action="ultimate"><span>奥</span><i class="cd"></i></button>
+        </div>
+        <div class="joystick" data-joystick="1">
+          <div class="joy-ring"></div>
+          <div class="joy-knob"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="rotate-hint">
+      <div class="rotate-icon">▭</div>
+      <strong>请横屏游玩</strong>
+      <span>旋转手机后继续 · 微信锁竖屏时可强制横屏</span>
+      <button id="force-landscape" class="primary" type="button">强制横屏</button>
+    </div>
+  </div>
+
+  <script defer src="./js/main.bundle.js"></script>
+</body>
+</html>

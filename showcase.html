@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#05060a" />
+  <title>奶黄小队 · 3D 模型展示</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='28' fill='%23ff5a4e'/%3E%3Ccircle cx='32' cy='32' r='18' fill='%23ffd166'/%3E%3C/svg%3E" />
+  <style>
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #05060a; color: #eef3ff; font-family: "Inter", "Microsoft YaHei", "PingFang SC", system-ui, sans-serif; touch-action: none; }
+    #view { display: block; width: 100vw; height: 100dvh; }
+    header {
+      position: fixed; left: 0; right: 0; top: 0; z-index: 5;
+      display: flex; align-items: flex-start; justify-content: space-between;
+      padding: clamp(14px, 2.5vmin, 28px) clamp(16px, 3vmin, 40px);
+      pointer-events: none;
+      background: linear-gradient(180deg, rgba(3,5,10,.72), transparent);
+    }
+    .eyebrow { font-size: clamp(9px, 1.2vmin, 12px); letter-spacing: .3em; color: #91a8d8; text-transform: uppercase; }
+    h1 {
+      margin: 6px 0 0; font-size: clamp(24px, 4.6vmin, 48px); line-height: 1; font-weight: 900; letter-spacing: .06em;
+      background: linear-gradient(180deg, #fff 20%, #ffc27c 70%, #ff6b4a);
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+      filter: drop-shadow(0 6px 24px rgba(255, 100, 60, .22));
+    }
+    .sub { margin-top: 7px; font-size: clamp(10px, 1.4vmin, 13px); color: #93a0bd; letter-spacing: .08em; }
+    .back {
+      pointer-events: auto; text-decoration: none; color: #dce6ff;
+      border: 1px solid rgba(170, 200, 255, .24); background: rgba(16, 24, 44, .72);
+      padding: 9px 16px; border-radius: 999px; font-size: clamp(10px, 1.4vmin, 13px);
+      backdrop-filter: blur(8px); white-space: nowrap; margin-top: 6px;
+    }
+    .back:hover { border-color: rgba(255, 200, 120, .6); }
+    .foot {
+      position: fixed; left: 0; right: 0; bottom: max(12px, env(safe-area-inset-bottom));
+      z-index: 5; text-align: center; pointer-events: none;
+      font-size: clamp(9px, 1.2vmin, 11px); color: #7482a3; letter-spacing: .12em;
+    }
+    #rotate-hint { display: none; }
+    @media (orientation: portrait) and (max-width: 900px) {
+      #rotate-hint {
+        position: fixed; inset: 0; z-index: 30; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+        background: radial-gradient(circle at 50% 35%, rgba(80,110,220,.18), transparent 50%), #05060a; text-align: center;
+      }
+      #rotate-hint .icon { width: 68px; height: 42px; border: 2px solid rgba(160,190,255,.6); border-radius: 8px; animation: rot 2.2s ease-in-out infinite; }
+      #rotate-hint strong { font-size: 20px; letter-spacing: .1em; }
+      #rotate-hint span { color: #8f9bb8; font-size: 12px; }
+      @keyframes rot { 0%,20% { transform: rotate(0); } 55%,100% { transform: rotate(90deg); } }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="view"></canvas>
+  <header>
+    <div>
+      <div class="eyebrow">3D MASCOT LINEUP · 六只角色</div>
+      <h1>奶黄小队</h1>
+      <div class="sub">程序化 + Bambu 扫描 · 可动骨骼 3D 模型</div>
+    </div>
+    <a class="back" href="./index.html">← 返回对战</a>
+  </header>
+  <div class="foot">奶黄 · 奶狗 · 奶娃 · 奶鼠 · 企鹅 · 奶蛋</div>
+  <div id="rotate-hint">
+    <div class="icon"></div>
+    <strong>请横屏查看</strong>
+    <span>六只角色一字排开</span>
+  </div>
+  <script type="module" src="./js/showcase.js"></script>
+</body>
+</html>
