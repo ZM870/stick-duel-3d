@@ -82,6 +82,18 @@ export class Fighter {
     return this.game.fighters[1 - this.player];
   }
 
+  upgradeModel() {
+    const asset = this.game.loadedModels?.[this.char.id];
+    if (!asset || this.stickman instanceof GltfMascot) return false;
+    const old = this.stickman;
+    try { this.game.arena.scene.remove(old.root); } catch { /* ignore */ }
+    this.stickman = new GltfMascot(this.char, asset.scene, asset.animations ?? []);
+    this.stickman.root.position.set(this.x, 0, this.z);
+    this.stickman.root.rotation.set(0, this.facingAngle, 0);
+    this.game.arena.scene.add(this.stickman.root);
+    return true;
+  }
+
   forward() {
     return { x: Math.sin(this.facingAngle), z: Math.cos(this.facingAngle) };
   }

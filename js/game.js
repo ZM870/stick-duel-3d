@@ -512,6 +512,10 @@ export class Game {
     if (this.netMode === 'host') this.netHostTick(dt);
   }
 
+  upgradeModels() {
+    for (const f of this.fighters) f.upgradeModel();
+  }
+
   separateFighters() {
     const [a, b] = this.fighters;
     if (a.isKo() || b.isKo()) return;

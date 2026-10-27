@@ -11,6 +11,7 @@ const arena = new Arena(canvas);
 const input = new Input();
 input.bind();
 const audio = new AudioEngine();
+audio.preloadBattleBgm?.();
 
 // Bambu Studio / 3MF 导出的网格（骨骼版优先，静态版 fallback）
 const loadedModels = {};
@@ -285,15 +286,21 @@ async function startGame() {
   starting = true;
   if (selectConfirm) selectConfirm.disabled = true;
   audio.resume();
+  audio.startBattleBgm();
   try {
     loading?.classList.add('show');
-    // 只加载当前选中的两名角色，不再等全部模型下载完
-    await ensurePair(selectedP1, selectedP2);
+    // 先开一局：最多等 0.9 秒模型；没下完先用程序化角色，下载完再热替换
+    const loadPromise = ensurePair(selectedP1, selectedP2);
+    await Promise.race([
+      loadPromise,
+      new Promise((resolve) => setTimeout(resolve, 900)),
+    ]);
     if (!game) {
       game = new Game(arena, input, audio, loadedModels);
       window.__game = game;
       game.setDifficulty(selectedDifficulty);
     }
+    loadPromise.then(() => game?.upgradeModels()).catch(() => {});
     lanMenu?.classList.remove('show');
     continueBtn.hidden = false;
     if (exitBtn) exitBtn.textContent = '退出';
@@ -306,6 +313,7 @@ async function startGame() {
     game.startMatch(selectedP1, selectedP2);
     if (isTouch) goFullscreen();
   } catch (err) {
+    audio.stopBattleBgm(200);
     loading?.classList.remove('show');
     showError(err?.stack || err?.message || err);
   } finally {
@@ -331,6 +339,7 @@ function continueMatch() {
     return;
   }
   audio.resume();
+  audio.startBattleBgm();
   game.setDifficulty(selectedDifficulty);
   game.startMatch(selectedP1, selectedP2);
 }

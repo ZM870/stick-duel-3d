@@ -487,6 +487,14 @@ export class AudioEngine {
     return this.battleBgm;
   }
 
+  preloadBattleBgm() {
+    try {
+      this.ensureBattleBgm()?.load();
+    } catch {
+      // 预加载失败不影响游戏
+    }
+  }
+
   tickBattleBgm() {
     if (!this.bgmActive) return;
     const a = this.battleBgm;
