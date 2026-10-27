@@ -15,6 +15,9 @@ export class AudioEngine {
     this.bgmDuckUntil = 0;
     this.bgmToken = 0;
     this.bgmTimer = null;
+    this.synthBgmTimer = null;
+    this.synthBgmNodes = [];
+    this.synthBgmActive = false;
     this.penguinSongTimer = null;
     this.penguinSongTimeouts = [];
     this.penguinSongActive = false;
@@ -520,6 +523,8 @@ export class AudioEngine {
     if (this.bgmActive) return;
     this.bgmActive = true;
     this.bgmToken += 1;
+    this.startSynthBgm();
+    a.addEventListener('playing', () => this.stopSynthBgm(), { once: true });
     a.pause();
     a.currentTime = 0;
     a.volume = 0;
@@ -535,7 +540,50 @@ export class AudioEngine {
     }
   }
 
+  startSynthBgm() {
+    if (!this.ctx || !this.master || this.synthBgmActive) return;
+    this.stopSynthBgm();
+    this.synthBgmActive = true;
+    const notes = [220, 277.18, 329.63, 392, 329.63, 277.18, 246.94, 293.66];
+    let step = 0;
+    const play = () => {
+      if (!this.synthBgmActive || !this.ctx) return;
+      const t = this.ctx.currentTime;
+      const o = this.ctx.createOscillator();
+      const g = this.ctx.createGain();
+      o.type = 'triangle';
+      o.frequency.value = notes[step % notes.length];
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(0.018, t + 0.05);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.52);
+      o.connect(g);
+      g.connect(this.master);
+      o.start(t);
+      o.stop(t + 0.56);
+      this.synthBgmNodes.push(o);
+      if (this.synthBgmNodes.length > 8) {
+        const old = this.synthBgmNodes.shift();
+        try { old.disconnect(); } catch { /* ignore */ }
+      }
+      step += 1;
+    };
+    play();
+    this.synthBgmTimer = setInterval(play, 560);
+  }
+
+  stopSynthBgm() {
+    this.synthBgmActive = false;
+    if (this.synthBgmTimer) clearInterval(this.synthBgmTimer);
+    this.synthBgmTimer = null;
+    for (const node of this.synthBgmNodes) {
+      try { node.stop(); } catch { /* ignore */ }
+      try { node.disconnect(); } catch { /* ignore */ }
+    }
+    this.synthBgmNodes = [];
+  }
+
   stopBattleBgm(fadeMs = 900) {
+    this.stopSynthBgm();
     if (!this.bgmActive) return;
     this.bgmActive = false;
     this.bgmToken += 1;
