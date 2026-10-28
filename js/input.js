@@ -129,7 +129,8 @@ export class Input {
   }
 
   bindJoystickZone(zone, player) {
-    const el = zone.querySelector(`[data-joystick="${player}"]`);
+    const el = zone.querySelector(`[data-joystick="${player}"]`) ||
+      document.querySelector(`[data-joystick="${player}"]`);
     if (!el) return;
     const knob = el.querySelector('.joy-knob');
     const onDown = (e) => {
@@ -143,17 +144,15 @@ export class Input {
         if (e.clientX < jr.left - pad || e.clientX > jr.right + pad ||
             e.clientY < jr.top - pad || e.clientY > jr.bottom + pad) return;
       }
-      const r = zone.getBoundingClientRect();
-      // 左半边任意位置都能起手，右侧技能盘不抢触控
-      if (!forced && e.clientX > r.left + r.width * 0.58) return;
       e.preventDefault();
       if (this.joyPointer[player] !== null) return;
       this.joyPointer[player] = e.pointerId;
       if (!forced) {
-        const size = el.getBoundingClientRect().width || 112;
-        const x = Math.max(0, Math.min(r.width - size, e.clientX - r.left - size / 2));
-        const y = Math.max(0, Math.min(r.height - size, e.clientY - r.top - size / 2));
+        const size = el.getBoundingClientRect().width || 132;
+        const x = Math.max(0, Math.min(window.innerWidth - size, e.clientX - size / 2));
+        const y = Math.max(0, Math.min(window.innerHeight - size, e.clientY - size / 2));
         el.classList.add('floating');
+        el.style.position = 'fixed';
         el.style.left = `${x}px`;
         el.style.top = `${y}px`;
         el.style.bottom = 'auto';
@@ -174,6 +173,7 @@ export class Input {
       this.joy[player].x = 0;
       this.joy[player].y = 0;
       el.classList.remove('active', 'floating');
+      el.style.position = '';
       el.style.left = '';
       el.style.top = '';
       el.style.bottom = '';
@@ -191,7 +191,7 @@ export class Input {
     const r = el.getBoundingClientRect();
     const cx = r.left + r.width / 2;
     const cy = r.top + r.height / 2;
-    const max = Math.max(1, r.width * 0.32);
+    const max = Math.max(1, r.width * 0.42);
     let dx = e.clientX - cx;
     let dy = e.clientY - cy;
     const len = Math.hypot(dx, dy);
@@ -202,13 +202,13 @@ export class Input {
     let nx = dx / max;
     let ny = dy / max;
     const mag = Math.hypot(nx, ny);
-    if (mag < 0.16) {
+    if (mag < 0.12) {
       nx = 0;
       ny = 0;
     } else {
       // 死区外重新归一化，保证轻推也能移动
-      nx = (nx / mag) * Math.min(1, (mag - 0.16) / 0.84);
-      ny = (ny / mag) * Math.min(1, (mag - 0.16) / 0.84);
+      nx = (nx / mag) * Math.min(1, (mag - 0.12) / 0.88);
+      ny = (ny / mag) * Math.min(1, (mag - 0.12) / 0.88);
       if (Math.hypot(nx, ny) > 1) {
         const l = Math.hypot(nx, ny);
         nx /= l;
@@ -305,6 +305,7 @@ export class Input {
     }
     for (const el of this.joyEls) {
       el.classList.remove('active', 'floating');
+      el.style.position = '';
       el.style.left = '';
       el.style.top = '';
       el.style.bottom = '';

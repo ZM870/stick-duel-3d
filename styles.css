@@ -695,6 +695,28 @@ h1 {
   pointer-events: none;
 }
 
+/* 左半屏全高度都是摇杆起手区，方向轮盘会跟随手指出现 */
+#joystick-zone {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 50%;
+  height: 100%;
+  display: none;
+  z-index: 31;
+  touch-action: none;
+  pointer-events: auto;
+}
+
+body.playing #joystick-zone {
+  display: block;
+}
+
+body.result-open #joystick-zone,
+body.lan-paused #joystick-zone {
+  display: none !important;
+}
+
 /* 左半屏都是摇杆起手区：手指落在哪里，摇杆就出现在哪里 */
 #touch-controls .side.p1 {
   pointer-events: auto;
@@ -1304,7 +1326,7 @@ body.playing {
 @media (pointer: coarse) {
   :root {
     --btn: clamp(54px, 10vmin, 72px);
-    --joy: clamp(112px, 27vmin, 146px);
+    --joy: clamp(132px, 31vmin, 172px);
   }
 
   #touch-controls {
