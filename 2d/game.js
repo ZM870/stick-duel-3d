@@ -5,8 +5,9 @@
   const ctx = canvas.getContext('2d');
   const $ = (id) => document.getElementById(id);
   const W = 1280, H = 720;
-  const GROUND = 566;
-  const ARENA_LEFT = 90, ARENA_RIGHT = 1190;
+  const GROUND = 590;
+  const WORLD_W = 5200;
+  const ARENA_LEFT = 140, ARENA_RIGHT = WORLD_W - 140;
 
   const CHARS = {
     naiwa: {
@@ -110,7 +111,7 @@
       this.isKo = false;
     }
     get img() { return images[this.data.img]; }
-    get bodyH() { return 330 * this.data.scale; }
+    get bodyH() { return 292 * this.data.scale; }
     get bodyW() { return this.img ? this.bodyH * this.img.width / this.img.height : 150; }
     canAct() { return this.hitStun <= 0 && this.state !== 'ko' && this.state !== 'attack' && this.state !== 'skill' && this.state !== 'ultimate' && this.state !== 'dodge'; }
     move(dir) {
@@ -293,8 +294,9 @@
 
   function newGame(p1, p2) {
     game = {
-      p1: new Fighter(p1, 360, 1, false), p2: new Fighter(p2, 920, -1, true),
+      p1: new Fighter(p1, 2200, 1, false), p2: new Fighter(p2, 3100, -1, true),
       time: 90, round: 1, state: 'countdown', countdown: 2.6, shake: 0, over: false,
+      cameraX: 2010, cameraShake: 0,
     };
     $('menu2d').classList.remove('show'); $('result2d').classList.remove('show'); $('hud2d').style.display = 'flex';
     $('p1-name').textContent = game.p1.data.name; $('p2-name').textContent = game.p2.data.name;
@@ -343,6 +345,11 @@
     }
     for (const e of effects) e.update(dt);
     for (let i = effects.length - 1; i >= 0; i--) if (effects[i].life <= 0) effects.splice(i, 1);
+    if (game && game.state !== 'countdown') {
+      const target = Math.max(0, Math.min(WORLD_W - W, (game.p1.x + game.p2.x) / 2 - W / 2));
+      game.cameraX += (target - game.cameraX) * Math.min(1, dt * 4.2);
+      game.cameraShake = game.shake;
+    }
     updateHUD();
   }
 
@@ -367,45 +374,148 @@
     $('result2d').classList.add('show');
   }
 
-  function drawBackground() {
+  function drawBackground(camX = 0) {
     const t = performance.now() / 1000;
     const sky = ctx.createLinearGradient(0, 0, 0, GROUND);
     sky.addColorStop(0, '#102542'); sky.addColorStop(0.38, '#31597d'); sky.addColorStop(0.68, '#b46f58'); sky.addColorStop(1, '#e9b27b');
     ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
-    // soft clouds
-    ctx.save(); ctx.globalAlpha = 0.12; ctx.fillStyle = '#f5dcc0';
-    for (let i = 0; i < 5; i++) { ctx.beginPath(); ctx.ellipse(140 + i * 260, 120 + (i % 3) * 48, 100, 18, 0, 0, Math.PI * 2); ctx.fill(); }
-    ctx.restore();
-    // sun
-    ctx.save(); ctx.globalAlpha = 0.85; ctx.fillStyle = '#ffd99a'; ctx.beginPath(); ctx.arc(1000, 170, 62, 0, Math.PI * 2); ctx.fill(); ctx.restore();
-    // distant mountain layers
-    for (let layer = 0; layer < 3; layer++) {
-      const y = 330 + layer * 55; const amp = 80 - layer * 14;
-      ctx.fillStyle = ['#253b55', '#1b3048', '#13263b'][layer];
-      ctx.beginPath(); ctx.moveTo(-50, GROUND);
-      for (let x = -50; x <= W + 50; x += 60) ctx.lineTo(x, y - Math.abs(Math.sin(x * 0.006 + layer)) * amp);
-      ctx.lineTo(W + 50, GROUND); ctx.closePath(); ctx.fill();
-    }
-    // bamboo silhouettes
+
+    // sun and high clouds (slow parallax)
+    const sunX = 990 - camX * 0.035;
+    ctx.save(); ctx.globalAlpha = 0.9; ctx.fillStyle = '#ffd99a'; ctx.beginPath(); ctx.arc(sunX, 150, 64, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 0.12;
     for (let i = 0; i < 9; i++) {
-      const x = 70 + i * 148 + Math.sin(i * 2.2) * 30;
-      ctx.strokeStyle = i % 2 ? '#1d3a35' : '#28483d'; ctx.lineWidth = 5 + (i % 3);
-      ctx.beginPath(); ctx.moveTo(x, GROUND); ctx.bezierCurveTo(x + 6, 430, x - 8, 260, x + 12, 110); ctx.stroke();
-      ctx.fillStyle = i % 2 ? '#315b42' : '#3c6b4a';
-      for (let j = 0; j < 4; j++) { const yy = 180 + j * 65; ctx.beginPath(); ctx.moveTo(x, yy); ctx.quadraticCurveTo(x + 35, yy - 25, x + 55, yy - 45); ctx.stroke(); ctx.beginPath(); ctx.ellipse(x + 54, yy - 47, 18, 5, -0.5, 0, Math.PI * 2); ctx.fill(); }
+      const x = ((i * 420 - camX * 0.08 + t * 7) % (W + 500)) - 200;
+      ctx.beginPath(); ctx.ellipse(x, 95 + (i % 4) * 42, 120, 16, 0, 0, Math.PI * 2); ctx.fill();
     }
-    // torii gate
-    ctx.save(); ctx.globalAlpha = 0.92; ctx.fillStyle = '#8e3830'; ctx.fillRect(610, 320, 20, 190); ctx.fillRect(790, 320, 20, 190); ctx.fillRect(578, 308, 264, 20); ctx.fillStyle = '#5b2220'; ctx.fillRect(600, 345, 218, 11); ctx.restore();
-    // temple roof
-    ctx.save(); ctx.fillStyle = '#1a2028'; ctx.beginPath(); ctx.moveTo(300, 300); ctx.lineTo(390, 245); ctx.lineTo(480, 300); ctx.closePath(); ctx.fill(); ctx.fillRect(314, 300, 152, 70); ctx.fillStyle = '#d7a76a'; for (let x = 330; x < 460; x += 34) ctx.fillRect(x, 318, 14, 20); ctx.restore();
-    // ground
-    ctx.fillStyle = '#1a2027'; ctx.fillRect(0, GROUND, W, H - GROUND);
-    const g = ctx.createLinearGradient(0, GROUND, 0, H); g.addColorStop(0, '#403528'); g.addColorStop(0.1, '#30271e'); g.addColorStop(1, '#14110f');
+    ctx.restore();
+
+    // mountain ridges, two parallax layers
+    for (let layer = 0; layer < 3; layer++) {
+      const off = camX * (0.10 + layer * 0.035);
+      const y = 335 + layer * 52; const amp = 72 - layer * 12;
+      ctx.fillStyle = ['#2c4660', '#213a52', '#182e44'][layer];
+      ctx.beginPath(); ctx.moveTo(-20, GROUND);
+      for (let sx = -20; sx <= W + 20; sx += 44) ctx.lineTo(sx, y - Math.abs(Math.sin((sx + off) * 0.005 + layer)) * amp);
+      ctx.lineTo(W + 20, GROUND); ctx.closePath(); ctx.fill();
+    }
+
+    // distant tree line
+    ctx.fillStyle = '#132f35';
+    for (let i = 0; i < 30; i++) {
+      const wx = i * 210 + 80; const sx = wx - camX * 0.24;
+      if (sx < -180 || sx > W + 180) continue;
+      const h = 100 + (i * 37 % 70);
+      ctx.beginPath(); ctx.moveTo(sx - 45, 390); ctx.quadraticCurveTo(sx, 390 - h, sx + 45, 390); ctx.closePath(); ctx.fill();
+    }
+
+    // bamboo grove (mid layer)
+    for (let i = 0; i < 34; i++) {
+      const wx = 40 + i * 135 + Math.sin(i * 2.2) * 26;
+      const sx = wx - camX * 0.55;
+      if (sx < -80 || sx > W + 80) continue;
+      const h = 330 + (i * 23 % 100);
+      ctx.strokeStyle = i % 2 ? '#1d3a35' : '#28483d'; ctx.lineWidth = 5 + (i % 3);
+      ctx.beginPath(); ctx.moveTo(sx, GROUND); ctx.bezierCurveTo(sx + 6, GROUND - h * 0.45, sx - 8, GROUND - h * 0.78, sx + 12, GROUND - h); ctx.stroke();
+      ctx.fillStyle = i % 2 ? '#315b42' : '#3c6b4a';
+      for (let j = 0; j < 5; j++) {
+        const yy = GROUND - h + 80 + j * 52;
+        ctx.beginPath(); ctx.moveTo(sx, yy); ctx.quadraticCurveTo(sx + 34, yy - 24, sx + 56, yy - 42); ctx.stroke();
+        ctx.beginPath(); ctx.ellipse(sx + 55, yy - 44, 18, 5, -0.5, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+
+    // temple / training hall at the left
+    const templeX = 620 - camX * 0.68;
+    if (templeX > -330 && templeX < W + 330) {
+      ctx.save(); ctx.translate(templeX, 0);
+      ctx.fillStyle = '#171d24'; ctx.beginPath(); ctx.moveTo(-110, 355); ctx.lineTo(0, 295); ctx.lineTo(110, 355); ctx.closePath(); ctx.fill();
+      ctx.fillRect(-88, 355, 176, 92);
+      ctx.fillStyle = '#4b3426'; ctx.fillRect(-104, 350, 208, 14);
+      ctx.fillStyle = '#d7a76a'; for (let x = -65; x <= 65; x += 34) ctx.fillRect(x, 380, 13, 28);
+      ctx.fillStyle = '#8e3830'; ctx.fillRect(-6, 300, 12, 55);
+      ctx.restore();
+    }
+
+    // torii gates along the stage
+    for (const gx of [2700, 3700, 4700]) {
+      const sx = gx - camX;
+      if (sx < -260 || sx > W + 260) continue;
+      ctx.save(); ctx.globalAlpha = 0.94; ctx.fillStyle = '#8e3830';
+      ctx.fillRect(sx - 72, 335, 20, 255); ctx.fillRect(sx + 52, 335, 20, 255);
+      ctx.fillRect(sx - 104, 320, 208, 18); ctx.fillStyle = '#5b2220'; ctx.fillRect(sx - 82, 355, 164, 11);
+      ctx.restore();
+    }
+
+    // stone lanterns / training posts
+    for (let i = 0; i < 12; i++) {
+      const wx = 240 + i * 330; const sx = wx - camX * 0.92;
+      if (sx < -70 || sx > W + 70) continue;
+      ctx.fillStyle = '#263037'; ctx.fillRect(sx - 13, GROUND - 88, 26, 88);
+      ctx.fillStyle = '#c7a36a'; ctx.fillRect(sx - 19, GROUND - 110, 38, 22);
+      ctx.fillStyle = '#f2c879'; ctx.fillRect(sx - 8, GROUND - 106, 16, 12);
+    }
+
+    // training dummies and supply crates
+    for (const wx of [820, 2380, 4200]) {
+      const sx = wx - camX * 0.92;
+      if (sx < -100 || sx > W + 100) continue;
+      ctx.fillStyle = '#3b2a1d'; ctx.fillRect(sx - 5, GROUND - 145, 10, 145);
+      ctx.fillStyle = '#8b5938'; ctx.fillRect(sx - 34, GROUND - 190, 68, 12);
+      ctx.fillStyle = '#c79a62'; ctx.beginPath(); ctx.arc(sx, GROUND - 160, 17, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#6d442b'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(sx - 30, GROUND - 134); ctx.lineTo(sx + 30, GROUND - 134); ctx.stroke();
+    }
+    for (const wx of [640, 1880, 3560, 4860]) {
+      const sx = wx - camX * 0.96;
+      if (sx < -90 || sx > W + 90) continue;
+      ctx.fillStyle = '#4b3624'; ctx.fillRect(sx - 26, GROUND - 42, 52, 42);
+      ctx.strokeStyle = '#24170e'; ctx.lineWidth = 3; ctx.strokeRect(sx - 26, GROUND - 42, 52, 42);
+      ctx.beginPath(); ctx.moveTo(sx - 26, GROUND - 42); ctx.lineTo(sx + 26, GROUND); ctx.stroke();
+    }
+    for (const wx of [420, 1500, 2750, 3900, 5050]) {
+      const sx = wx - camX * 0.96;
+      if (sx < -80 || sx > W + 80) continue;
+      ctx.fillStyle = '#3a3e40'; ctx.beginPath(); ctx.ellipse(sx, GROUND - 8, 34, 14, 0, Math.PI, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#4b4f50'; ctx.beginPath(); ctx.ellipse(sx + 12, GROUND - 12, 18, 10, 0, Math.PI, Math.PI * 2); ctx.fill();
+    }
+
+    // foreground bamboo framing
+    ctx.save(); ctx.globalAlpha = 0.55;
+    for (const side of [0, 1]) {
+      const base = side ? W - 80 : 80;
+      for (let j = 0; j < 3; j++) {
+        const sx = base + (side ? -1 : 1) * j * 34;
+        ctx.strokeStyle = '#0d201f'; ctx.lineWidth = 12 - j * 2;
+        ctx.beginPath(); ctx.moveTo(sx, H); ctx.quadraticCurveTo(sx + 12, 380, sx - 8, 100 + j * 50); ctx.stroke();
+        ctx.fillStyle = '#142b25';
+        for (let k = 0; k < 4; k++) { ctx.beginPath(); ctx.ellipse(sx + (side ? -1 : 1) * (28 + k * 6), 170 + k * 70, 25, 6, side ? 0.5 : -0.5, 0, Math.PI * 2); ctx.fill(); }
+      }
+    }
+    ctx.restore();
+
+    // ground and stone tiles
+    ctx.fillStyle = '#171b20'; ctx.fillRect(0, GROUND, W, H - GROUND);
+    const g = ctx.createLinearGradient(0, GROUND, 0, H); g.addColorStop(0, '#5a4632'); g.addColorStop(0.12, '#3b2e24'); g.addColorStop(1, '#14110f');
     ctx.fillStyle = g; ctx.fillRect(0, GROUND + 8, W, H - GROUND);
-    ctx.strokeStyle = '#b18c5944'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(0, GROUND + 14); ctx.lineTo(W, GROUND + 14); ctx.stroke();
+    ctx.strokeStyle = '#c7a36a35'; ctx.lineWidth = 2;
+    const x0 = -((camX * 1) % 92);
+    for (let x = x0; x < W + 92; x += 92) { ctx.beginPath(); ctx.moveTo(x, GROUND + 12); ctx.lineTo(x + 40, H); ctx.stroke(); }
+    ctx.strokeStyle = '#b18c5944'; ctx.beginPath(); ctx.moveTo(0, GROUND + 14); ctx.lineTo(W, GROUND + 14); ctx.stroke();
+
     // foreground grass
-    ctx.strokeStyle = '#56704a66'; ctx.lineWidth = 2;
-    for (let x = 0; x < W; x += 18) { const h = 8 + ((x * 13) % 17); ctx.beginPath(); ctx.moveTo(x, GROUND + 10); ctx.lineTo(x + 4, GROUND - h); ctx.stroke(); }
+    ctx.strokeStyle = '#56704a77'; ctx.lineWidth = 2;
+    for (let x = -20; x < W + 20; x += 16) {
+      const h = 8 + ((x + camX * 1.1) * 13 % 17 + 17) % 17;
+      ctx.beginPath(); ctx.moveTo(x, GROUND + 10); ctx.lineTo(x + 4, GROUND - h); ctx.stroke();
+    }
+
+    // drifting petals
+    ctx.save(); ctx.fillStyle = '#efb7a0aa';
+    for (let i = 0; i < 18; i++) {
+      const px = ((i * 197 - camX * 0.2 + t * 24) % (W + 100)) - 50;
+      const py = 160 + ((i * 83 + t * 20) % 300);
+      ctx.beginPath(); ctx.ellipse(px, py, 3.5, 1.5, Math.sin(t + i) * 0.8, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
   }
 
   function frame(now) {
@@ -413,10 +523,11 @@
     update(dt);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, W, H);
-    drawBackground();
+    const camX = game ? game.cameraX : 0;
+    drawBackground(camX);
     if (game) {
       const shakeX = (Math.random() - 0.5) * game.shake * 10;
-      ctx.save(); ctx.translate(shakeX, 0);
+      ctx.save(); ctx.translate(-camX + shakeX, 0);
       game.p1.draw(); game.p2.draw();
       for (const e of effects) e.draw();
       ctx.restore();
