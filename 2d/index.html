@@ -1,0 +1,73 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<title>奶黄小队 · 2D 横屏对战</title>
+<link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+<div id="app">
+  <canvas id="arena" width="1280" height="720"></canvas>
+
+  <div id="hud2d">
+    <div class="fighter-hud left">
+      <div class="hud-top"><span id="p1-name">奶娃</span><span id="p1-wins" class="wins"></span></div>
+      <div class="bar"><i id="p1-hp"></i><b id="p1-hp-text">1000</b></div>
+      <div class="energy"><i id="p1-energy"></i></div>
+      <div id="p1-buffs" class="buffs"></div>
+    </div>
+    <div class="center-hud"><strong id="timer">90</strong><small id="round-label">ROUND 1</small></div>
+    <div class="fighter-hud right">
+      <div class="hud-top"><span id="p2-wins" class="wins"></span><span id="p2-name">奶鼠</span></div>
+      <div class="bar"><i id="p2-hp"></i><b id="p2-hp-text">1000</b></div>
+      <div class="energy"><i id="p2-energy"></i></div>
+      <div id="p2-buffs" class="buffs"></div>
+    </div>
+  </div>
+
+  <div id="menu2d" class="screen show">
+    <div class="menu-wrap">
+      <div class="eyebrow">2D SIDE-SCROLLING DUEL</div>
+      <h1>奶黄小队<br /><span>横屏对战</span></h1>
+      <p class="tagline">选择角色 · 木叶训练场 · 拳拳到肉</p>
+      <div id="char-grid" class="char-grid"></div>
+      <div class="menu-actions">
+        <button id="start2d" class="primary2d">开始对战</button>
+        <button id="back3d" class="ghost2d">返回 3D 版</button>
+      </div>
+      <p class="hint2d">A/D 移动 · 空格跳跃 · J 普攻 · K 技1 · L 技2 · I 大招 · Shift 闪避</p>
+    </div>
+  </div>
+
+  <div id="result2d" class="screen result2d">
+    <div class="result-card">
+      <div id="result-title2d">胜利</div>
+      <div id="result-sub2d"></div>
+      <div class="result-actions">
+        <button id="rematch2d" class="primary2d">再来一局</button>
+        <button id="menu2d-btn" class="ghost2d">返回选人</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="loading2d" class="screen loading2d show"><div>加载角色…</div></div>
+
+  <div id="touch2d">
+    <div class="pad">
+      <button data-act="left">◀</button>
+      <button data-act="right">▶</button>
+    </div>
+    <div class="skills">
+      <button data-act="attack">攻</button>
+      <button data-act="skill1">技1</button>
+      <button data-act="skill2">技2</button>
+      <button data-act="ultimate">奥</button>
+      <button data-act="dodge">闪</button>
+      <button data-act="jump">跳</button>
+    </div>
+  </div>
+</div>
+<script src="./game.js"></script>
+</body>
+</html>
