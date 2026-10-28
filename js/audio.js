@@ -164,6 +164,48 @@ export class AudioEngine {
     this.tone(230, 0.12, 'triangle', 0.018, -110);
   }
 
+  thanosPunch(stage = 0) {
+    if (!this.enabled || !this.ctx) return;
+    this.thump(96 - stage * 8, 42, 0.2 + stage * 0.03, 0.11);
+    if (stage >= 2) this.noiseBurst({ duration: 0.12, vol: 0.045, freq: 300, toFreq: 90, q: 0.7 });
+  }
+
+  thanosStomp() {
+    if (!this.enabled || !this.ctx) return;
+    this.thump(68, 28, 0.3, 0.13);
+    this.noiseBurst({ duration: 0.18, vol: 0.055, freq: 220, toFreq: 70, q: 0.7 });
+  }
+
+  thanosGrab() {
+    if (!this.enabled || !this.ctx) return;
+    this.tone(105, 0.4, 'sawtooth', 0.042, -45);
+    this.tone(54, 0.35, 'sine', 0.05, 10);
+  }
+
+  thanosShieldOn() {
+    if (!this.enabled || !this.ctx) return;
+    this.tone(120, 0.4, 'triangle', 0.05, 35);
+    this.thump(90, 45, 0.35, 0.05);
+  }
+
+  thanosShieldBreak() {
+    if (!this.enabled || !this.ctx) return;
+    this.noiseBurst({ duration: 0.25, vol: 0.075, freq: 500, toFreq: 120, q: 0.8 });
+    this.thump(120, 42, 0.22, 0.08);
+  }
+
+  thanosSummon() {
+    if (!this.enabled || !this.ctx) return;
+    this.thump(58, 22, 0.5, 0.14);
+    this.tone(46, 0.5, 'sawtooth', 0.04, -12);
+  }
+
+  jianguoPunch() {
+    if (!this.enabled || !this.ctx) return;
+    this.thump(88, 36, 0.22, 0.1);
+    this.noiseBurst({ duration: 0.12, vol: 0.04, freq: 260, toFreq: 90, q: 0.7 });
+  }
+
   dodgeFail() {
     if (!this.enabled || !this.ctx) return;
     this.tone(150, 0.09, 'square', 0.028, -45);

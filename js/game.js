@@ -4,6 +4,88 @@ import { Fighter } from './fighter.js';
 import { AIController } from './ai.js';
 import { ParticleSystem, Projectile, Ring, Slash, Pillar, DamageText, RasenganCharge, RockBurst, WindAura, Footprint, StonePickup, PeckStar, MiniRing, WindArc, GoldCross, BeakOrb, GroundAura, MusicNote, QuestionMark, ShieldAura, SlowAura, Feather, EllipsisMark } from './effects.js';
 
+class ThanosSummon {
+  constructor(game, owner) {
+    this.game = game;
+    this.owner = owner;
+    this.x = owner.x + (owner.player === 0 ? 1.5 : -1.5);
+    this.z = owner.z + 0.8;
+    this.hp = 320;
+    this.maxHp = 320;
+    this.until = game.time + 4;
+    this.punchTimer = 0.7;
+    this.punchAnim = 0;
+    const template = game.loadedModels?.thanos?.scene;
+    if (template) {
+      this.root = template.clone(true);
+      this.root.scale.setScalar(1.2);
+      this.root.traverse((o) => {
+        if (o.isMesh && o.material) {
+          o.material = o.material.clone();
+          o.material.color?.multiplyScalar(0.78);
+          o.material.emissive?.setHex(0x2a1608);
+          o.material.emissiveIntensity = 0.18;
+        }
+      });
+    } else {
+      this.root = new THREE.Group();
+      const body = new THREE.Mesh(
+        new THREE.CapsuleGeometry(0.34, 1.2, 4, 8),
+        new THREE.MeshStandardMaterial({ color: 0x332b3b, roughness: 0.8 })
+      );
+      body.position.y = 1.1;
+      this.root.add(body);
+    }
+    this.root.position.set(this.x, 0, this.z);
+    game.scene.add(this.root);
+  }
+
+  update(dt) {
+    const opponent = this.owner.opponent;
+    const dx = opponent.x - this.x;
+    const dz = opponent.z - this.z;
+    const dist = Math.hypot(dx, dz);
+    const nx = dist > 0.01 ? dx / dist : 1;
+    const nz = dist > 0.01 ? dz / dist : 0;
+    if (dist > 2.1) {
+      this.x += nx * 0.75 * dt;
+      this.z += nz * 0.75 * dt;
+    }
+    this.root.rotation.y = Math.atan2(nx, nz);
+    this.punchTimer -= dt;
+    this.punchAnim = Math.max(0, this.punchAnim - dt * 3.2);
+    if (this.punchTimer <= 0 && dist < 2.5 && !opponent.isKo()) {
+      this.punchTimer = 1.15;
+      this.punchAnim = 1;
+      opponent.takeHit(this.owner, {
+        damage: 55, knockback: 5.2, hitstun: 0.3, color: 0xb08a4a,
+      }, 55);
+      this.game.onThanosSummonPunch(this, opponent);
+      this.game.audio.jianguoPunch();
+    }
+    this.root.position.set(this.x, 0, this.z);
+    this.root.rotation.z = this.punchAnim * -0.12;
+    this.root.visible = this.game.time < this.until && this.hp > 0;
+  }
+
+  syncFromNet(data, dt) {
+    if (data) {
+      this.x += (data.x - this.x) * Math.min(1, dt * 15);
+      this.z += (data.z - this.z) * Math.min(1, dt * 15);
+      this.hp = data.hp ?? this.hp;
+      this.root.position.set(this.x, 0, this.z);
+      this.root.visible = (data.remaining || 0) > 0;
+    } else {
+      this.root.visible = false;
+    }
+  }
+
+  dispose() {
+    this.game.scene.remove(this.root);
+  }
+}
+
+
 const $ = (id) => document.getElementById(id);
 
 function aiLabel(character) {
@@ -72,6 +154,7 @@ export class Game {
     this.paused = false;
     this.netResultShown = false;
     this.projectileSeq = 0;
+    this.thanosSummon = null;
     this.fighters = [
       new Fighter(this, 0, CHARACTERS[this.p1Id]),
       new Fighter(this, 1, CHARACTERS[this.p2Id]),
@@ -90,6 +173,8 @@ export class Game {
       p2Energy: $('p2-energy'),
       p1Wins: $('p1-wins'),
       p2Wins: $('p2-wins'),
+      p1Buffs: $('p1-buffs'),
+      p2Buffs: $('p2-buffs'),
       timer: $('timer'),
       roundLabel: $('round-label'),
       announce: $('announce'),
@@ -108,6 +193,7 @@ export class Game {
 
   setCharacters(p1Id, p2Id) {
     if (!CHARACTERS[p1Id] || !CHARACTERS[p2Id]) return;
+    this.removeThanosSummon();
     if (p1Id === this.p1Id && p2Id === this.p2Id) {
       this.ui.p1Name.textContent = this.fighters[0].char.name;
       this.ui.p2Name.textContent = aiLabel(this.fighters[1].char);
@@ -234,6 +320,11 @@ export class Game {
         penguinConfusedUntil: f.penguinConfusedUntil,
         penguinDeepUntil: f.penguinDeepUntil,
         penguinStunUntil: f.penguinStunUntil,
+        thanosShieldStacks: f.thanosShieldStacks,
+        thanosShieldHp: f.thanosShieldHp,
+        thanosStunUntil: f.thanosStunUntil,
+        thanosImbalanceUntil: f.thanosImbalanceUntil,
+        thanosUltActive: f.thanosUltActive,
         slowUntil: f.slowUntil, slowFactor: f.slowFactor,
         grounded: f.grounded, spinAngle: f.spinAngle, wins: f.wins,
       })),
@@ -241,6 +332,11 @@ export class Game {
         id: p.netId, x: p.x, z: p.z, y: p.y, radius: p.radius, style: p.style,
         color: p.skill?.color ?? 0xffffff,
       })),
+      summon: this.thanosSummon ? {
+        x: this.thanosSummon.x, z: this.thanosSummon.z,
+        hp: this.thanosSummon.hp, maxHp: this.thanosSummon.maxHp,
+        remaining: Math.max(0, this.thanosSummon.until - this.time),
+      } : null,
     });
   }
 
@@ -289,6 +385,11 @@ export class Game {
         f.penguinConfusedUntil = d.penguinConfusedUntil || 0;
         f.penguinDeepUntil = d.penguinDeepUntil || 0;
         f.penguinStunUntil = d.penguinStunUntil || 0;
+        f.thanosShieldStacks = d.thanosShieldStacks || 0;
+        f.thanosShieldHp = d.thanosShieldHp || 0;
+        f.thanosStunUntil = d.thanosStunUntil || 0;
+        f.thanosImbalanceUntil = d.thanosImbalanceUntil || 0;
+        f.thanosUltActive = !!d.thanosUltActive;
         f.slowUntil = d.slowUntil || 0;
         f.slowFactor = d.slowFactor || 1;
         this.updatePenguinShieldAura(f);
@@ -306,6 +407,7 @@ export class Game {
         }
       }
       this.updateNetProjectiles(snap.projectiles || []);
+      this.updateNetSummon(snap.summon, dt);
       this.syncNetResult(snap);
     }
     for (const f of this.fighters) {
@@ -325,6 +427,15 @@ export class Game {
     const winner = this.fighters[snap.winner ?? (this.fighters[0].wins > this.fighters[1].wins ? 0 : 1)];
     this.netResultShown = true;
     this.showResult(winner);
+  }
+
+  updateNetSummon(data, dt) {
+    if (!data) {
+      this.removeThanosSummon();
+      return;
+    }
+    if (!this.thanosSummon) this.thanosSummon = new ThanosSummon(this, this.fighters[0]);
+    this.thanosSummon.syncFromNet(data, dt);
   }
 
   updateNetProjectiles(list) {
@@ -380,6 +491,14 @@ export class Game {
         const pos = new THREE.Vector3(e.x, 0.7, e.z);
         this.rings.push(new Ring(this.scene, new THREE.Vector3(e.x, 0.08, e.z), 0xffd166, { maxScale: 2.4, duration: 0.3 }));
         this.particles.spawn(pos, 0xffd166, 16, 3.2, 0.3);
+      } else if (e.type === 'thanosFx') {
+        const pos = new THREE.Vector3(e.x ?? 0, 0.12, e.z ?? 0);
+        const color = e.kind === 'wave' || e.kind === 'shieldOn' || e.kind === 'summon' ? 0xb08a4a : 0x8f5cff;
+        const size = e.kind === 'wave' ? 6.5 : e.kind === 'ultStart' ? 7 : 2.4;
+        this.rings.push(new Ring(this.scene, pos, color, { maxScale: size, duration: 0.45 }));
+        this.particles.spawn(pos, color, 12, 3.2, 0.3);
+        if (e.kind === 'summon' || e.kind === 'ultStart') this.audio.thanosSummon();
+        if (e.kind === 'shieldBreak') this.audio.thanosShieldBreak();
       } else if (e.type === 'skill') {
         const base = f.char.skills[e.key];
         if (base) this.onSkillStart(f, { ...base, ...(e.skill || {}) });
@@ -406,6 +525,7 @@ export class Game {
   }
 
   startRound() {
+    this.removeThanosSummon();
     for (const p of this.projectiles) p.kill();
     this.projectiles = [];
     for (const r of this.rings) r.kill();
@@ -509,11 +629,104 @@ export class Game {
 
     this.arena.update(dt, this.time, this.fighters, this.localPlayer);
     this.updateHUD();
+    if (this.netMode !== 'client') this.updateThanosSummon(dt);
     if (this.netMode === 'host') this.netHostTick(dt);
   }
 
   upgradeModels() {
     for (const f of this.fighters) f.upgradeModel();
+  }
+
+  onThanosAttackStart(fighter, stage) {
+    const pos = new THREE.Vector3(fighter.x, 0.08, fighter.z);
+    if (stage === 2) {
+      this.rings.push(new Ring(this.scene, pos, 0x8f5cff, { maxScale: 1.4, duration: 0.35 }));
+      this.audio.thanosStomp();
+    } else if (stage === 3) {
+      this.rings.push(new Ring(this.scene, pos, 0xb08a4a, { maxScale: 2.2, duration: 0.35 }));
+      this.slashes.push(new Slash(this.scene, new THREE.Vector3(fighter.x, 1.1, fighter.z), fighter.facingAngle, 0x8f5cff, { duration: 0.28 }));
+    }
+    this.emitNet('thanosFx', { kind: 'attack', stage, x: fighter.x, z: fighter.z, player: fighter.player });
+  }
+
+  onThanosPullStart(fighter) {
+    const pos = new THREE.Vector3(fighter.x, 0.1, fighter.z);
+    this.rings.push(new Ring(this.scene, pos, 0x8f5cff, { maxScale: 5.5, duration: 0.5 }));
+    this.particles.spawn(new THREE.Vector3(fighter.x, 0.7, fighter.z), 0x8f5cff, 18, 3.4, 0.35);
+    this.emitNet('thanosFx', { kind: 'pull', x: fighter.x, z: fighter.z, player: fighter.player });
+  }
+
+  onThanosPullHit(fighter, target) {
+    this.rings.push(new Ring(this.scene, new THREE.Vector3(target.x, 0.1, target.z), 0x8f5cff, { maxScale: 2.4, duration: 0.3 }));
+    this.emitNet('thanosFx', { kind: 'pullHit', x: target.x, z: target.z, player: fighter.player });
+  }
+
+  onThanosShieldOn(fighter) {
+    this.rings.push(new Ring(this.scene, new THREE.Vector3(fighter.x, 0.1, fighter.z), 0xb08a4a, { maxScale: 2.6, duration: 0.4 }));
+    this.emitNet('thanosFx', { kind: 'shieldOn', x: fighter.x, z: fighter.z, player: fighter.player });
+  }
+
+  onThanosShieldBreak(fighter) {
+    this.rings.push(new Ring(this.scene, new THREE.Vector3(fighter.x, 0.1, fighter.z), 0x8f5cff, { maxScale: 2.0, duration: 0.25 }));
+    this.audio.thanosShieldBreak();
+    this.emitNet('thanosFx', { kind: 'shieldBreak', x: fighter.x, z: fighter.z, player: fighter.player });
+  }
+
+  onThanosUltStart(fighter) {
+    this.announce('平衡裁决 · 唤父', '', 1.2);
+    this.rings.push(new Ring(this.scene, new THREE.Vector3(fighter.x, 0.08, fighter.z), 0xb08a4a, { maxScale: 7.0, duration: 0.8 }));
+    this.pillars.push(new Pillar(this.scene, new THREE.Vector3(fighter.x, 0.08, fighter.z), 0xb08a4a, { height: 7, duration: 1.0 }));
+    this.flash = Math.max(this.flash, 0.5);
+    this.emitNet('thanosFx', { kind: 'ultStart', x: fighter.x, z: fighter.z, player: fighter.player });
+  }
+
+  thanosShockwave(fighter) {
+    const target = fighter.opponent;
+    this.rings.push(new Ring(this.scene, new THREE.Vector3(fighter.x, 0.08, fighter.z), 0xb08a4a, { maxScale: 6.5, duration: 0.55 }));
+    this.particles.spawn(new THREE.Vector3(fighter.x, 0.5, fighter.z), 0xb08a4a, 20, 4.5, 0.4);
+    this.arena.shake = Math.max(this.arena.shake, 7);
+    if (Math.hypot(target.x - fighter.x, target.z - fighter.z) <= 6.5 && !target.isKo()) {
+      target.thanosImbalanceUntil = this.time + 2.5;
+      target.takeHit(fighter, {
+        damage: 68, knockback: 1.5, hitstun: 0.16, color: 0xb08a4a,
+      }, 68);
+    }
+    this.audio.thump(72, 32, 0.22, 0.08);
+    this.emitNet('thanosFx', { kind: 'wave', x: fighter.x, z: fighter.z, player: fighter.player });
+  }
+
+  onThanosUltEnd(fighter) {
+    this.rings.push(new Ring(this.scene, new THREE.Vector3(fighter.x, 0.08, fighter.z), 0xb08a4a, { maxScale: 3.0, duration: 0.5 }));
+    this.emitNet('thanosFx', { kind: 'ultEnd', x: fighter.x, z: fighter.z, player: fighter.player });
+  }
+
+  spawnThanosSummon(owner) {
+    if (this.netMode === 'client') return;
+    this.removeThanosSummon();
+    this.thanosSummon = new ThanosSummon(this, owner);
+    this.rings.push(new Ring(this.scene, new THREE.Vector3(owner.x, 0.08, owner.z), 0xb08a4a, { maxScale: 2.8, duration: 0.5 }));
+    this.audio.thanosSummon();
+    this.emitNet('thanosFx', { kind: 'summon', x: owner.x, z: owner.z, player: owner.player });
+  }
+
+  onThanosSummonPunch(summon, target) {
+    this.rings.push(new Ring(this.scene, new THREE.Vector3(target.x, 0.1, target.z), 0xb08a4a, { maxScale: 1.8, duration: 0.25 }));
+    this.emitNet('thanosFx', { kind: 'summonPunch', x: target.x, z: target.z, player: summon.owner.player });
+  }
+
+  removeThanosSummon() {
+    if (this.thanosSummon) {
+      this.thanosSummon.dispose();
+      this.thanosSummon = null;
+    }
+  }
+
+  updateThanosSummon(dt) {
+    if (!this.thanosSummon) return;
+    this.thanosSummon.update(dt);
+    if (this.time >= this.thanosSummon.until || this.thanosSummon.hp <= 0) {
+      this.removeThanosSummon();
+    }
   }
 
   separateFighters() {
@@ -731,6 +944,7 @@ export class Game {
   }
 
   returnToMenu() {
+    this.removeThanosSummon();
     this.audio.stopBattleBgm(450);
     this.audio.stopPenguinSong();
     this.audio.stopPenguinUltimate(250);
@@ -1257,10 +1471,17 @@ export class Game {
         this.ui.p2Energy.style.width = `${enPct}%`;
       }
       const winsEl = i === 0 ? this.ui.p1Wins : this.ui.p2Wins;
+      const buffsEl = i === 0 ? this.ui.p1Buffs : this.ui.p2Buffs;
       const wins = f.wins;
       let html = '';
       for (let w = 0; w < WINS_NEEDED; w++) html += `<i class="${w < wins ? 'on' : ''}"></i>`;
       winsEl.innerHTML = html;
+      if (buffsEl) {
+        let buffs = '';
+        if (f.thanosImbalanceUntil > this.time) buffs += '<span class="buff imbalance">失衡</span>';
+        if (f.thanosShieldStacks > 0) buffs += `<span class="buff shield">硬壳×${f.thanosShieldStacks}</span>`;
+        buffsEl.innerHTML = buffs;
+      }
     }
     this.ui.timer.textContent = String(Math.ceil(this.timer));
     this.ui.roundLabel.textContent = `ROUND ${this.round}`;

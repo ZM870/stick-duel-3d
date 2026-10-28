@@ -1896,3 +1896,37 @@ body.lan-paused #touch-controls {
   font-weight: 800;
   user-select: text;
 }
+
+/* 灭霸 buff 标记 */
+.buffs {
+  display: flex;
+  gap: 5px;
+  min-height: 14px;
+  margin-top: 3px;
+  flex-wrap: wrap;
+}
+
+.buff {
+  display: inline-flex;
+  align-items: center;
+  height: 15px;
+  padding: 0 5px;
+  border-radius: 3px;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.buff.imbalance {
+  color: #e4d4ff;
+  background: rgba(80, 40, 125, 0.78);
+  border: 1px solid rgba(166, 123, 255, 0.55);
+  box-shadow: 0 0 8px rgba(143, 92, 255, 0.22);
+}
+
+.buff.shield {
+  color: #ffe4a8;
+  background: rgba(65, 49, 20, 0.7);
+  border: 1px solid rgba(176, 138, 74, 0.6);
+}

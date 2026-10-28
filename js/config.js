@@ -246,6 +246,38 @@ export const CHARACTERS = {
       ultDamage: 290,
     }),
   },
+  thanos: {
+    id: 'thanos',
+    name: '灭霸',
+    title: '泰坦征服者',
+    color: 0x7d5aa8,
+    accent: 0xb08a4a,
+    glow: 0x8f5cff,
+    bodyColor: 0x4a3b63,
+    bellyColor: 0x8c7fa6,
+    accentColor: 0xb08a4a,
+    pawColor: 0x2a2233,
+    eyeColor: 0x9f7cff,
+    maxHp: 1600,
+    speed: 3.7,
+    modelUrl: './assets/models/thanos_bambu.glb',
+    skills: createSkills({
+      attackName: '泰坦重击',
+      skill1Name: '空间拉扯',
+      skill2Name: '泰坦硬壳',
+      ultName: '平衡裁决',
+      skill1Type: 'melee',
+      color: 0x8f5cff,
+      projectileColor: 0xb08a4a,
+      projectileTrail: 0x8f5cff,
+      ultColor: 0xb08a4a,
+      attackDamage: 78,
+      skillDamage: 55,
+      projectileDamage: 70,
+      skill2Cost: 0,
+      ultDamage: 120,
+    }),
+  },
   naidan: {
     id: 'naidan',
     name: '奶蛋',
@@ -280,7 +312,7 @@ export const CHARACTERS = {
   },
 };
 
-export const CHARACTER_ORDER = ['naihuang', 'naigou', 'naiwa', 'naishu', 'penguin', 'naidan'];
+export const CHARACTER_ORDER = ['naihuang', 'naigou', 'naiwa', 'naishu', 'penguin', 'thanos', 'naidan'];
 
 export function getCharacter(id) {
   return CHARACTERS[id] || CHARACTERS[CHARACTER_ORDER[0]];

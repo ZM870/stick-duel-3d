@@ -62,12 +62,14 @@ const MODEL_URLS = {
   naiwa: './assets/models/naiwa_rigged.glb?v=13',
   naishu: './assets/models/naishu_rigged.glb',
   penguin: './assets/models/penguin_rigged.glb?v=3',
+  thanos: './assets/models/thanos_bambu.glb',
 };
 const MODEL_STATIC_URLS = {
   naigou: './assets/models/naigou_bambu.glb',
   naiwa: './assets/models/naiwa_bambu.glb',
   naishu: './assets/models/naishu_bambu.glb',
   penguin: './assets/models/penguin_bambu.glb?v=3',
+  thanos: './assets/models/thanos_bambu.glb',
 };
 const modelLoads = new Map();
 

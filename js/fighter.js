@@ -66,6 +66,16 @@ export class Fighter {
     this.penguinStepTimer = 0;
     this.stoneRushQueue = 0;
     this.stoneRushCooldown = 0;
+    this.thanosShieldStacks = 0;
+    this.thanosShieldHp = 0;
+    this.thanosStunUntil = 0;
+    this.thanosImbalanceUntil = 0;
+    this.thanosLastDamageAt = -99;
+    this.thanosUltActive = false;
+    this.thanosUltSummoned = false;
+    this.thanosUltNextWave = 0;
+    this.thanosUltWaveCount = 0;
+    this.thanosRegenAt = 0;
 
     const asset = game.loadedModels?.[character.id];
     const template = asset?.scene ?? asset;
@@ -76,6 +86,20 @@ export class Fighter {
         : new Stickman(character);
     this.stickman.root.position.set(this.x, 0, this.z);
     game.arena.scene.add(this.stickman.root);
+    if (character.id === 'thanos') {
+      this.stickman.root.traverse((o) => {
+        if (!o.isMesh || !o.material) return;
+        const mats = Array.isArray(o.material) ? o.material : [o.material];
+        for (const m of mats) {
+          if (m.color) m.color.multiplyScalar(1.35);
+          if (m.emissive) {
+            m.emissive.setHex(0x1b1028);
+            m.emissiveIntensity = 0.28;
+          }
+          m.roughness = 0.7;
+        }
+      });
+    }
   }
 
   get opponent() {
@@ -91,6 +115,20 @@ export class Fighter {
       next = new GltfMascot(this.char, asset.scene, asset.animations ?? []);
       next.root.position.set(this.x, 0, this.z);
       next.root.rotation.set(0, this.facingAngle, 0);
+      if (this.char.id === 'thanos') {
+        next.root.traverse((o) => {
+          if (!o.isMesh || !o.material) return;
+          const mats = Array.isArray(o.material) ? o.material : [o.material];
+          for (const m of mats) {
+            if (m.color) m.color.multiplyScalar(1.35);
+            if (m.emissive) {
+              m.emissive.setHex(0x1b1028);
+              m.emissiveIntensity = 0.28;
+            }
+            m.roughness = 0.7;
+          }
+        });
+      }
       this.stickman = next;
       this.game.arena.scene.add(next.root);
       try { this.game.arena.scene.remove(old.root); } catch { /* ignore */ }
@@ -174,6 +212,16 @@ export class Fighter {
     this.penguinStepTimer = 0;
     this.stoneRushQueue = 0;
     this.stoneRushCooldown = 0;
+    this.thanosShieldStacks = 0;
+    this.thanosShieldHp = 0;
+    this.thanosStunUntil = 0;
+    this.thanosImbalanceUntil = 0;
+    this.thanosLastDamageAt = -99;
+    this.thanosUltActive = false;
+    this.thanosUltSummoned = false;
+    this.thanosUltNextWave = 0;
+    this.thanosUltWaveCount = 0;
+    this.thanosRegenAt = 0;
     this.cooldowns = { attack: 0, skill1: 0, skill2: 0, ultimate: 0, dodge: 0 };
     this.invuln = 0;
     this.flash = 0;
@@ -219,6 +267,13 @@ export class Fighter {
     }
     if (this.state !== 'ko') {
       this.energy = Math.min(ENERGY_MAX, this.energy + ENERGY_REGEN * dt);
+    }
+    if (this.char.id === 'thanos' && !this.thanosUltActive &&
+        this.thanosShieldStacks < 2 && this.game.time - this.thanosLastDamageAt > 5 &&
+        this.game.time >= this.thanosRegenAt) {
+      this.thanosShieldStacks += 1;
+      this.thanosShieldHp = this.thanosShieldStacks * 180;
+      this.thanosRegenAt = this.game.time + 3;
     }
 
     if (this.state === 'ko') {
@@ -324,6 +379,29 @@ export class Fighter {
       return;
     }
 
+    if (this.state === 'thanosPull') {
+      this.updateThanosPull(dt);
+      this.clampArena();
+      return;
+    }
+
+    if (this.state === 'thanosShieldCast') {
+      this.stickman.update(dt, this);
+      if (this.stateTime >= 0.58) {
+        this.current = null;
+        this.currentAction = null;
+        this.state = 'idle';
+        this.stateTime = 0;
+      }
+      return;
+    }
+
+    if (this.state === 'thanosUlt') {
+      this.updateThanosUltimate(dt);
+      this.clampArena();
+      return;
+    }
+
     if (this.state === 'skill' && this.current) {
       this.updateSkill(dt);
       this.clampArena();
@@ -336,8 +414,9 @@ export class Fighter {
     this.facingAngle = angleLerp(this.facingAngle, targetAngle, 1 - Math.exp(-dt * 10));
 
     // 移动
-    const axis = this.penguinStunUntil > this.game.time ? { x: 0, y: 0 } : this.moveAxis();
-    const slow = this.slowUntil > this.game.time ? this.slowFactor : 1;
+    const axis = (this.penguinStunUntil > this.game.time || this.thanosStunUntil > this.game.time) ? { x: 0, y: 0 } : this.moveAxis();
+    const imbalance = this.thanosImbalanceUntil > this.game.time ? 0.62 : 1;
+    const slow = (this.slowUntil > this.game.time ? this.slowFactor : 1) * imbalance;
     const speed = this.char.speed * slow;
     const tx = axis.x * speed;
     const tz = axis.y * speed;
@@ -1018,6 +1097,111 @@ export class Fighter {
     return true;
   }
 
+  startThanosPull(base) {
+    this.current = {
+      ...base, type: 'melee', custom: 'thanosPull',
+      damage: 45, range: this.thanosShieldStacks > 0 ? 7.0 : 5.5,
+      startup: 0.3, active: 0.1, recovery: 0.3,
+    };
+    this.currentAction = 'skill1';
+    this.currentDamage = 45;
+    this.state = 'thanosPull';
+    this.stateTime = 0;
+    this.hitDone = false;
+    this.energy -= base.cost;
+    this.cooldowns.skill1 = 8;
+    this.game.onThanosPullStart(this, this.current);
+    this.game.audio.thanosGrab();
+    return true;
+  }
+
+  startThanosShield(base) {
+    this.current = { ...base, custom: 'thanosShield', startup: 0.28, active: 0.1, recovery: 0.2 };
+    this.currentAction = 'skill2';
+    this.state = 'thanosShieldCast';
+    this.stateTime = 0;
+    this.thanosShieldStacks = 2;
+    this.thanosShieldHp = 360;
+    this.cooldowns.skill2 = 12;
+    this.game.onThanosShieldOn(this);
+    this.game.audio.thanosShieldOn();
+    return true;
+  }
+
+  startThanosUltimate(base) {
+    this.current = {
+      ...base, type: 'ultimate', custom: 'thanosUlt',
+      damage: 120, range: 6.5, startup: 0.9, active: 0.1, recovery: 0.5,
+    };
+    this.currentAction = 'ultimate';
+    this.currentDamage = 120;
+    this.state = 'thanosUlt';
+    this.stateTime = 0;
+    this.energy -= 100;
+    this.cooldowns.ultimate = 22;
+    this.thanosUltActive = true;
+    this.thanosUltSummoned = false;
+    this.thanosUltWaveCount = 0;
+    this.thanosUltNextWave = 2.0;
+    this.thanosShieldStacks = 2;
+    this.thanosShieldHp = 360;
+    this.game.onThanosUltStart(this);
+    this.game.audio.thanosSummon();
+    return true;
+  }
+
+  updateThanosPull(dt) {
+    const t = this.stateTime;
+    this.stickman.update(dt, this);
+    if (!this.hitDone && t >= 0.3) {
+      this.hitDone = true;
+      const dx = this.opponent.x - this.x;
+      const dz = this.opponent.z - this.z;
+      const dist = Math.hypot(dx, dz);
+      if (dist < this.current.range && !this.opponent.isKo()) {
+        const nx = dx / Math.max(0.01, dist);
+        const nz = dz / Math.max(0.01, dist);
+        const range = this.current.range;
+        this.opponent.x = this.x + nx * Math.min(range, Math.max(1.15, dist - 2.4));
+        this.opponent.z = this.z + nz * Math.min(range, Math.max(1.15, dist - 2.4));
+        this.opponent.thanosStunUntil = this.game.time + 0.5;
+        this.opponent.takeHit(this, {
+          ...this.current, damage: 45, hitstun: 0.3, knockback: 0, color: 0x8f5cff,
+        }, 45);
+        this.game.onThanosPullHit(this, this.opponent);
+        this.game.audio.thump(90, 40, 0.18, 0.07);
+      }
+    }
+    if (t >= 0.7) {
+      this.current = null;
+      this.currentAction = null;
+      this.state = 'idle';
+      this.stateTime = 0;
+    }
+  }
+
+  updateThanosUltimate(dt) {
+    const t = this.stateTime;
+    this.stickman.update(dt, this);
+    if (!this.thanosUltSummoned && t >= 0.9) {
+      this.thanosUltSummoned = true;
+      this.game.spawnThanosSummon(this);
+    }
+    while (t >= this.thanosUltNextWave && this.thanosUltWaveCount < 6) {
+      this.thanosUltNextWave += 0.5;
+      this.thanosUltWaveCount += 1;
+      this.game.thanosShockwave(this);
+    }
+    if (t >= 6.2) {
+      this.current = null;
+      this.currentAction = null;
+      this.thanosUltActive = false;
+      this.state = 'idle';
+      this.stateTime = 0;
+      this.game.onThanosUltEnd(this);
+    }
+  }
+
   startSkill(action) {
     if (!this.canAct()) return false;
     const base = this.char.skills[action];
@@ -1026,6 +1210,12 @@ export class Fighter {
     if (this.energy < base.cost) {
       this.game.toast(`${this.char.name}：能量不足`);
       return false;
+    }
+
+    if (this.char.id === 'thanos') {
+      if (action === 'skill1') return this.startThanosPull(base);
+      if (action === 'skill2') return this.startThanosShield(base);
+      if (action === 'ultimate') return this.startThanosUltimate(base);
     }
 
     if (this.char.id === 'penguin') {
@@ -1080,6 +1270,18 @@ export class Fighter {
     this.currentAction = action;
     const mult = action === 'attack' ? [1, 1.15, 1.35][Math.max(0, this.comboStep)] : 1;
     this.currentDamage = Math.round(base.damage * mult);
+    if (this.char.id === 'thanos' && action === 'attack') {
+      const stage = this.comboStep;
+      this.current.thanosStage = stage;
+      this.current.startup = [0.16, 0.22, 0.28, 0.45][stage] ?? 0.2;
+      this.current.active = stage === 2 ? 0.16 : 0.1;
+      this.current.recovery = [0.22, 0.26, 0.32, 0.4][stage] ?? 0.25;
+      this.current.range = stage === 2 ? 2.3 : 2.15;
+      this.currentDamage = Math.round(base.damage * [1, 1.25, 1.45, 1.8][stage]);
+      this.comboTimer = 0.8;
+      this.game.onThanosAttackStart(this, stage);
+      this.game.audio.thanosPunch(stage);
+    }
     if (this.char.id === 'penguin' && action === 'attack') {
       this.current.peckStage = this.comboStep;
       if (this.comboStep === 0) {
@@ -1263,7 +1465,23 @@ export class Fighter {
     if (this.invuln > 0 && !skill.ignoreInvuln) return false;
     const wasPenguinChannel = this.char.id === 'penguin' &&
       (this.current?.custom === 'song' || this.current?.custom === 'admin');
+    const thanosUltGuard = this.char.id === 'thanos' && this.thanosUltActive;
     let finalDamage = damage;
+    if (this.char.id === 'thanos') {
+      this.thanosLastDamageAt = this.game.time;
+      if (this.thanosShieldHp > 0) {
+        const absorb = Math.min(this.thanosShieldHp, finalDamage * 0.65);
+        this.thanosShieldHp -= absorb;
+        finalDamage -= absorb;
+        this.thanosShieldStacks = Math.ceil(this.thanosShieldHp / 180);
+        if (this.thanosShieldHp <= 0) {
+          this.thanosShieldStacks = 0;
+          this.game.onThanosShieldBreak(this);
+        }
+      }
+      if (finalDamage > 90) finalDamage *= 0.84;
+      if (thanosUltGuard) finalDamage *= 0.65;
+    }
     const oldShieldStacks = this.penguinShieldStacks;
     const songGuard = this.char.id === 'penguin' && this.current?.custom === 'song';
     const adminGuard = this.char.id === 'penguin' && this.current?.custom === 'admin';
@@ -1299,6 +1517,7 @@ export class Fighter {
     let kb = skill.knockback ?? 3;
     if (this.char.id === 'penguin' && this.penguinShield > 0) kb *= 0.15;
     if (adminGuard) kb = 0;
+    if (thanosUltGuard) kb = 0;
     this.vx = f.x * kb;
     this.vz = f.z * kb;
     if (this.char.id === 'penguin' && kb >= 4.5) {
